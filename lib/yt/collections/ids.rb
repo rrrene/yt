@@ -1,19 +1,19 @@
 require 'yt/collections/base'
-require 'yt/models/snippet'
+require 'yt/models/id'
 
 module Yt
   module Collections
-    class Snippets < Base
+    class Ids < Base
 
     private
 
       def new_item(data)
-        Yt::Snippet.new data: data['snippet']
+        Yt::Id.new data['id']
       end
 
       def list_params
         super.tap do |params|
-          params[:params] = {id: @parent.id, part: 'snippet'}
+          params[:params] = {forUsername: @parent.username, part: 'id'}
           params[:path] = "/youtube/v3/#{@parent.kind.pluralize}"
         end
       end

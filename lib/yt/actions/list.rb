@@ -3,9 +3,15 @@ require 'yt/actions/request'
 module Yt
   module Actions
     module List
-
       delegate :count, :first, :any?, :each, :map, :find, to: :list
       alias size count
+
+      def first!
+        first.tap do |item|
+          Request.fail!
+          raise RequestError, 'Not Found' unless item
+        end
+      end
 
     private
 

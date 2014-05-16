@@ -389,8 +389,12 @@ export YT_TEST_DEVICE_CLIENT_SECRET="1234567890"
 export YT_TEST_SERVER_API_KEY="123456789012345678901234567890"
 ```
 
-[ TODO: Complete this section. Explain how get and store the refresh token,
-  making sure all the required scopes are authorized. ]
+[ TODO:
+  Complete this section.
+  Explain how get and store the refresh token, making sure all the required scopes are authorized:
+  'https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile'
+]
+
 
 
 How to contribute

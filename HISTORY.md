@@ -1,5 +1,10 @@
+v0.5 - 2014/05/13
+-----------------
+
+* ...
+
 v0.4 - 2014/05/09
---------------------
+-----------------
 
 * Complete rewrite, using ActiveSupport and separating models and collections
 * New methods to handle annotations, details sets

@@ -13,7 +13,6 @@ module Yt
       @uri = URI::HTTPS.build options.slice(:host, :path, :query)
       @method = options[:method]
       @format = options[:format]
-      @scope = options[:scope]
       @body = options[:body]
       @body_type = options[:body_type]
       @auth = options[:auth]
@@ -23,8 +22,17 @@ module Yt
     def run
       add_authorization_to_request! if requires_authorization?
       fetch_response.tap do |response|
-        response.body = parse_format response.body if response.body
-        # puts "You can try again running #{to_curl}"
+        unless response.is_a? Net::HTTPNotFound
+          # This is because even if we ask for JSON, a 404 will return text
+          response.body = parse_format response.body if response.body
+        end
+        if (response.is_a?(Net::HTTPUnauthorized) || response.is_a?(Net::HTTPForbidden)) && @auth && @auth.authorization_error.nil?
+          response.body['oauth_url'] = @auth.authorization_code_url
+        end
+
+        require 'pry'
+        binding.pry
+
         raise RequestError, response.body unless response.is_a? Net::HTTPSuccess
       end
     end
@@ -33,7 +41,6 @@ module Yt
       {}.tap do |params|
         params[:format] = :json
         params[:host] = 'www.googleapis.com'
-        params[:scope] = 'https://www.googleapis.com/auth/youtube'
         params[:body_type] = :json
       end
     end
@@ -41,8 +48,8 @@ module Yt
   private
 
     def add_authorization_to_request!
-      if @auth.respond_to? :access_token_for
-        @headers['Authorization'] = "Bearer #{@auth.access_token_for @scope}"
+      if @auth
+        @headers['Authorization'] = "Bearer #{@auth.access_token}"
       elsif Yt.configuration.api_key
         params = URI.decode_www_form @uri.query || ''
         params << [:key, Yt.configuration.api_key]

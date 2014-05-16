@@ -1,38 +1,20 @@
 require 'yt/models/base'
 require 'yt/config'
 
+require 'yt/models/credentials_set'
+
 module Yt
   # Provides methods to access a YouTube account.
   class Account < Base
+    attr_reader :credentials_set
+    delegate :access_token, :refresh_token, to: :credentials_set
 
+    has_one :user_info, delegate: [:id, :email]
     has_one :channel, delegate: [:videos, :playlists, :create_playlist, :delete_playlists, :update_playlists]
-    has_one :user_info, delegate: [:id, :email, :has_verified_email?, :gender,
-      :name, :given_name, :family_name, :profile_url, :avatar_url, :locale, :hd]
 
     def initialize(options = {})
-      # By default is someone passes a refresh_token but not a scope, we can assume it's a youtube one
-      @scope = options.fetch :scope, 'https://www.googleapis.com/auth/youtube'
-      @access_token = options[:access_token]
-      @refresh_token = options[:refresh_token]
-      @redirect_url = options[:redirect_url]
-    end
-
-    def access_token_for(scope)
-      # TODO incremental scope
-
-      # HERE manage the fact that we must change some scope on device,
-      # like 'https://www.googleapis.com/auth/youtube.readonly' is not accepted
-      if Yt.configuration.scenario == :device_app && scope == 'https://www.googleapis.com/auth/youtube.readonly'
-        scope = 'https://www.googleapis.com/auth/youtube'
-      end
-
-      # TODO !! include? is not enough, because (for instance) 'youtube' also includes 'youtube.readonly'
-
-      # unless (@scope == scope) || (scope == 'https://www.googleapis.com/auth/youtube.readonly' && @scope =='https://www.googleapis.com/auth/youtube')
-      #   @scope = scope
-      #   @access_token = @refresh_token = nil
-      # end
-      @access_token ||= refresh_access_token || get_access_token
+      credentials_set_options = options.slice *credentials_options
+      @credentials_set = CredentialsSet.new credentials_set_options
     end
 
     def auth
@@ -41,28 +23,54 @@ module Yt
 
   private
 
-    # Obtain a new access token using the refresh token
-    def refresh_access_token
-      if @refresh_token
-        body = {grant_type: 'refresh_token', refresh_token: @refresh_token}
-        request = Request.new auth_params.deep_merge(body: body)
-        response = request.run
-        response.body['access_token']
-      end
+    def credentials_options
+      [:code, :error, :access_token, :expires_at, :refresh_token, :redirect_uri, :scopes]
+    end
+  end
+
+  class DeleteMe
+
+    attr_reader :access_token, :expires_at, :refresh_token, :authorization_error
+
+    def initialize(params = {})
+      @scopes = params.fetch :scopes, []
+      @access_token = params[:access_token]
+      @refresh_token = params[:refresh_token]
+      @authorization_code = params[:authorization_code] || params[:code]
+      @authorization_error = params[:authorization_error] || params[:error]
+      @redirect_uri = params[:redirect_uri]
     end
 
-    def auth_params
-      {
-        host: 'accounts.google.com',
-        path: '/o/oauth2/token',
-        format: :json,
-        body_type: :form,
-        method: :post,
-        body: {
-          client_id: Yt.configuration.client_id,
-          client_secret: Yt.configuration.client_secret
-        }
-      }
+    def access_token_for(scopes)
+      @access_token ||= refresh_access_token || get_access_token
     end
+
+    # This is the URL the user has to visit in order to obtain an authorization
+    # code that grants access to the @scopes specified
+    def authorization_code_url
+      query = {}
+      query[:scope] = scope
+      query[:redirect_uri] = @redirect_uri
+      query[:response_type] = :code
+      query[:client_id] = Yt.configuration.client_id
+      # query[:approval_prompt] = :force
+      query[:access_type] = :offline
+
+      url = URI::HTTPS.build host: 'accounts.google.com', path: '/o/oauth2/auth', query: query.to_param
+      url.to_s
+    end
+
+    def auth
+      self
+    end
+
+  private
+
+    def scope
+      @scopes.map{|scope| "https://www.googleapis.com/auth/#{scope}"}.join ' '
+    end
+
+
+
   end
 end
